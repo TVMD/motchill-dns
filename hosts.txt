@@ -1,0 +1,4 @@
+# Replace these examples with your hostnames, one per line.
+# Hostnames or HTTPS URLs are accepted; no credentials or custom ports.
+example.com
+example.org

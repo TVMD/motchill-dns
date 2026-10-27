@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>First responding host</title>
+  <style>
+    body { font: 1.1rem/1.6 system-ui, sans-serif; max-width: 40rem; margin: 12vh auto; padding: 1.5rem; color: #182535; background: #f6f8fb; }
+    #status { overflow-wrap: anywhere; }
+    #result { color: white; background: #124cb8; padding: .6rem 1.2rem; border-radius: .3rem; text-decoration: none; }
+    #result:focus-visible { outline: 3px solid #182535; outline-offset: 4px; }
+  </style>
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <main>
+    <p id="status" role="status" aria-live="polite" aria-atomic="true" aria-busy="true"></p>
+    <a id="result" hidden>Go</a>
+    <noscript>Enable JavaScript to check hostnames.</noscript>
+  </main>
+</body>
+</html>

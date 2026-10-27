@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Host list</title>
+</head>
+<body>
+  <p id="error" role="alert"></p>
+  <script>
+    const path = window.location.pathname.replace(/\/$/, '');
+    const list = path.slice(path.lastIndexOf('/') + 1);
+    if (/^[a-zA-Z0-9_-]+$/.test(list)) {
+      const target = new URL(window.location.href);
+      target.pathname = path.slice(0, path.lastIndexOf('/') + 1);
+      target.search = new URLSearchParams({ list }).toString();
+      target.hash = '';
+      window.location.replace(target.href);
+    } else {
+      document.querySelector('#error').textContent = 'Invalid list name.';
+    }
+  </script>
+  <noscript>Enable JavaScript to check hostnames.</noscript>
+</body>
+</html>
