@@ -1,6 +1,6 @@
 # First responding host
 
-A static GitHub Pages app: opening the page loads a text list, races HTTPS GET requests to every host, and displays only the winning hostname and a **Go** button linking to it. Reload to check again. No dependencies or build step.
+A static GitHub Pages app: opening the page loads a text list, checks HTTPS hosts one by one in file order, and displays only the winning hostname and a **Go** button linking to it. Reload to check again. No dependencies or build step.
 
 GitHub Pages only serves static files; it cannot run a Rust or FastAPI server. This implementation runs in each visitor's browser, so it returns a hostname on the page, not through a server API or DNS response.
 
@@ -51,7 +51,7 @@ See [GitHub's publishing instructions](https://docs.github.com/en/pages/getting-
 
 Cross-origin requests use `no-cors`, so hosts do not need to enable CORS. The browser hides status codes and response content: **404, 500, redirects, and network blocking pages can win**. This checks reachability, not application health. Browser policy, extensions, TLS failures, redirects and the visitor's network can affect results. Requests omit credentials and referrers and bypass the browser HTTP cache; intermediaries may still cache responses. Redirects are followed, and the result is the original configured hostname.
 
-The first fulfilled request wins, regardless of list order. Failed requests cannot win. Remaining requests are cancelled after a winner, all failures or an 8-second deadline. Loading `hosts.txt` has its own 8-second deadline. Cancelling a request does not undo a request already received by a host.
+Checks start at the top of the selected text file and run one at a time. The first reachable host is selected, and later entries are not requested. A failed request, a visible HTTP error, or an 8-second timeout advances to the next host. Cross-origin opaque responses still hide HTTP errors, as described above. Each host has its own timeout, so a list of N unreachable hosts can take about N × 8 seconds, plus list loading. Loading the text file has a separate 8-second deadline. Requests are cancelled after each attempt; cancellation does not undo a request already received by a host.
 
 For guaranteed HTTP success/content validation, use CORS-enabled health endpoints or host a backend outside GitHub Pages. See [MDN's description of opaque responses](https://developer.mozilla.org/en-US/docs/Web/API/Response/type).
 

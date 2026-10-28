@@ -38,33 +38,62 @@ test('loads named lists and rejects unsafe list names before fetching', async ()
   await assert.rejects(loadHosts(async () => ({ ok: false, status: 404 }), 'rophim'), /rophim.txt/);
 });
 
-test('starts all probes; ignores early failure; first response wins and aborts losers', async () => {
+test('checks one at a time in file order and stops at the first response', async () => {
   const requests = [];
   const fetcher = (url, options) => new Promise((resolve, reject) => {
     requests.push({ url, options, resolve, reject });
   });
   const result = firstRespondingHost(['a.example', 'b.example', 'c.example'], { fetcher });
-  assert.equal(requests.length, 3);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].url, 'https://a.example/');
   requests[0].reject(new Error('offline'));
-  requests[2].resolve({ type: 'opaque', status: 0 });
-  assert.equal(await result, 'c.example');
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].url, 'https://b.example/');
+  assert.equal(requests[0].options.signal.aborted, true);
+  requests[1].resolve({ type: 'opaque', status: 0 });
+  assert.equal(await result, 'b.example');
+  assert.equal(requests.length, 2);
   assert.ok(requests.every(({ options }) => options.signal.aborted));
   assert.equal(requests[1].options.credentials, 'omit');
   assert.equal(requests[1].options.mode, 'no-cors');
-  assert.equal(requests[1].url, 'https://b.example/');
 });
 
-test('reports all failed and empty races', async () => {
+test('a responding first entry prevents all later checks', async () => {
+  const calls = [];
+  const winner = await firstRespondingHost(['a.example', 'b.example'], {
+    fetcher: async url => { calls.push(url); return { type: 'opaque' }; },
+  });
+  assert.equal(winner, 'a.example');
+  assert.deepEqual(calls, ['https://a.example/']);
+});
+
+test('skips HTTP errors when the browser exposes status', async () => {
+  const winner = await firstRespondingHost(['a.example', 'b.example'], {
+    fetcher: async url => ({ type: 'basic', ok: url.includes('b.example') }),
+  });
+  assert.equal(winner, 'b.example');
+});
+
+test('reports all failed and empty lists', async () => {
   await assert.rejects(firstRespondingHost(['a.example'], { fetcher: async () => { throw new Error('offline'); } }), /No host responded/);
   await assert.rejects(firstRespondingHost([]), /No hostnames/);
 });
 
-test('deadline settles even if fetch hangs, cancels requests and allows retry', async () => {
-  let signal;
-  await assert.rejects(firstRespondingHost(['a.example'], {
+test('times out a hanging host before trying the next host', async () => {
+  const requests = [];
+  assert.equal(await firstRespondingHost(['a.example', 'b.example'], {
     timeoutMs: 5,
-    fetcher: (_, options) => { signal = options.signal; return new Promise(() => {}); },
-  }), /timed out/);
-  assert.equal(signal.aborted, true);
-  assert.equal(await firstRespondingHost(['a.example'], { fetcher: async () => ({ type: 'opaque' }) }), 'a.example');
+    fetcher: (url, options) => {
+      requests.push({ url, signal: options.signal });
+      if (url.includes('a.example')) return new Promise(() => {});
+      assert.equal(requests[0].signal.aborted, true);
+      return Promise.resolve({ type: 'opaque' });
+    },
+  }), 'b.example');
+  assert.equal(requests.length, 2);
+  assert.notEqual(requests[0].signal, requests[1].signal);
+  await assert.rejects(firstRespondingHost(['a.example'], {
+    timeoutMs: 5, fetcher: () => new Promise(() => {}),
+  }), /No host responded/);
 });

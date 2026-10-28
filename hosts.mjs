@@ -35,26 +35,25 @@ export async function loadHosts(fetcher = fetch, list = 'hosts') {
 
 export async function firstRespondingHost(hosts, { fetcher = fetch, timeoutMs = 8000 } = {}) {
   if (!hosts.length) throw new Error('No hostnames to check.');
-  const controller = new AbortController();
-  let timer;
-  const deadline = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('Host checks timed out. Try again.')), timeoutMs);
-  });
-  try {
-    const probes = hosts.map(async host => {
-      // shortcut: opaque responses hide HTTP errors; use a CORS health endpoint if health checks are needed.
-      await fetcher(`https://${host}/`, {
+  for (const host of hosts) {
+    const controller = new AbortController();
+    let timer;
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Host check timed out.')), timeoutMs);
+    });
+    try {
+      const response = await Promise.race([fetcher(`https://${host}/`, {
         mode: 'no-cors', credentials: 'omit', cache: 'no-store',
         referrerPolicy: 'no-referrer', signal: controller.signal,
-      });
-      return host;
-    });
-    return await Promise.race([Promise.any(probes), deadline]);
-  } catch (error) {
-    if (error instanceof AggregateError) throw new Error('No host responded.');
-    throw error;
-  } finally {
-    clearTimeout(timer);
-    controller.abort();
+      }), deadline]);
+      // shortcut: opaque responses hide HTTP errors; use a CORS health endpoint if health checks are needed.
+      if (response.type === 'opaque' || response.ok) return host;
+    } catch {
+      // A failed or timed-out host must not prevent checking the next entry.
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+    }
   }
+  throw new Error('No host responded.');
 }
